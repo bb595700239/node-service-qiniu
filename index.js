@@ -2,6 +2,9 @@ const express = require('express');
 const app = express();
 const bodyParser = require('body-parser')
 const https = require("https");
+const imageinfo = require('imageinfo')
+
+const OSS = require('ali-oss');
 
 
 const http = require('http')
@@ -11,34 +14,16 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
 
-const getFn = function (subres, bucket, limit, marker, authorization) {
-	let resData = [];
-	const req = http.request({
-		host: "rsf.qbox.me",
-		port: 80,
-		method: 'GET',
-		path: '/list?bucket=' + bucket + '&limit=' + limit + '&marker=' + marker,
-		headers: {"Authorization": authorization}
-	}, function (res) {
-		console.log('STATUS: ' + res.statusCode);
-		console.log('HEADERS: ' + JSON.stringify(res.headers));
-		res.setEncoding('utf8');
-		res.on('data', function (chunk) {
-			resData.push(chunk)
-		});
-		res.on("end", function () {
-			items = JSON.parse(resData.join(""));
-			subres.json(items)
-		});
-	});
-	req.on('error', function (e) {
-		console.log('problem with request: ' + e.message);
-	});
-	req.end();
+
+
+
+// 生成唯一编码
+function createRandomId() {
+	return (Math.random() * 10000000).toString(16).substr(0, 4) + '_' + (new Date()).getTime() + '_' + Math.random().toString().substr(2, 5);
+
 }
-
-const sisyphus = function (host, src, authorization) {
-
+const sisyphus = function (host, json) {
+	const config = json.config.clientRequest
 	const getbase64Img = function (url) {
 		let protocol = http
 		if (url.indexOf('https:') > -1) {
@@ -58,10 +43,28 @@ const sisyphus = function (host, src, authorization) {
 				res.on('end', function (err) {
 					//Buffer.concat将chunks数组中的缓冲数据拼接起来，返回一个新的Buffer对象赋值给data
 					var data = Buffer.concat(chunks, size);
-					//将Buffer对象转换为字符串并以base64编码格式显示
-					const base64Img = data.toString('base64');
-					//进入终端terminal,然后进入index.js所在的目录，
-					resolve(base64Img)
+
+					let client = new OSS({
+						region: config.region,
+						accessKeyId: 'LTAIOstXfKeQplLk',
+						accessKeySecret: 'R5OCVKuXXtYppFFaByc4eoh4vDLhY1',
+						bucket: config.bucket
+					});
+
+					const info = imageinfo(data)
+					
+					async function putBuffer() {
+						try {
+							let result = await client.put(config.SystemOssChannelName+'/'+createRandomId() + '.' + info.format, data);
+							resolve(result.url)
+						} catch (e) {
+							console.log(e);
+						}
+					}
+
+					putBuffer();
+
+					
 				});
 			});
 			req.on('error', function (e) {
@@ -72,35 +75,11 @@ const sisyphus = function (host, src, authorization) {
 	}
 
 	let promises = []
-	src.forEach((item) => {
-		console.log(item)
+	json.src.forEach((item) => {
 		promises.push(new Promise((resolve, reject) => {
 			getbase64Img(item).then(base64 => {
-				let req = http.request({
-					host: host,
-					port: 80,
-					method: 'POST',
-					path: '/putb64/-1',
-					headers: {"Authorization": authorization, "Content-Type": "application/octet-stream"}
-				}, function (res) {
-					let resData = [];
-					console.log('STATUS: ' + res.statusCode);
-					console.log('HEADERS: ' + JSON.stringify(res.headers));
-					res.setEncoding('utf8');
-					res.on('data', function (chunk) {
-						resData.push(chunk)
-					});
-					res.on("end", function () {
-						items = JSON.parse(resData.join(""));
-						//subres.json(items)
-						resolve(items)
-					});
-				});
-				req.write(base64);
-				req.on('error', function (e) {
-					console.log('problem with request: ' + e.message);
-				});
-				req.end();
+				console.log(base64);
+				resolve(base64)
 			})
 		}))
 	})
@@ -109,13 +88,6 @@ const sisyphus = function (host, src, authorization) {
 }
 
 
-app.get('/list', (req, res) => {
-	const bucket = req.query.bucket
-	const limit = req.query.limit
-	const marker = req.query.marker
-	const authorization = req.headers.authorization
-	getFn(res, bucket, limit, marker, authorization)
-})
 
 app.post('/catchimage', (req, res) => {
 	req.rawBody = '';//添加接收变量
@@ -126,13 +98,12 @@ app.post('/catchimage', (req, res) => {
 	req.on('end', function () {
 		json = req.rawBody.toString()
 		json = JSON.parse(json)
-		const authorization = req.headers.authorization
-		Promise.all(sisyphus(json.host, json.src, authorization)).then(subres => {
+		Promise.all(sisyphus(json.host, json)).then(subres => {
 			res.json(subres)
 		})
 	})
 })
 
-app.listen(3001, () => {
-	console.log('正在监听端口3001');
+app.listen(3004, () => {
+	console.log('正在监听端口3004');
 })

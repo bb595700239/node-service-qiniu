@@ -2,9 +2,11 @@
   "name": "node-service",
   "devDependencies": {},
   "dependencies": {
+    "ali-oss": "^6.12.0",
     "body-parser": "^1.18.3",
     "cors": "^2.8.5",
     "express": "^4.16.4",
-    "https": "^1.0.0"
+    "https": "^1.0.0",
+    "imageinfo": "^1.0.4"
   }
 }
