@@ -68,12 +68,12 @@ const sisyphus = function ( json) {
 						accessKeySecret: 'R5OCVKuXXtYppFFaByc4eoh4vDLhY1',
 						bucket: config.bucket
 					});
-
 					const info = imageinfo(data)
-					
+					const path = config.SystemOssChannelName + '/' + createRandomId()
+					const format = info ? '.' + info.format.toLowerCase():''
 					async function putBuffer() {
 						try {
-							let result = await client.put(config.SystemOssChannelName+'/'+createRandomId() + '.' + info.format, data);
+							let result = await client.put(path + format, data);
 							resolve({ source: url, url: result.url, state: "SUCCESS" })
 						} catch (e) {
 							resolve({ source: url, message: e, state: "FAIL" })
