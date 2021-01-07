@@ -15,6 +15,24 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
 
 
+/* const client = new OSS({
+	region: 'oss-cn-hangzhou',
+	accessKeyId: 'LTAIOstXfKeQplLk',
+	accessKeySecret: 'R5OCVKuXXtYppFFaByc4eoh4vDLhY1',
+	bucket: 'park-common'
+});
+
+async function put() {
+	try {
+		//object-name可以自定义为文件名（例如file.txt）或目录（例如abc/test/file.txt）的形式，实现将文件上传至当前Bucket或Bucket下的指定目录。
+		let result = await client.put('object-name', 'C:/Users/ADMINI~1/AppData/Local/Temp/ksohtml15760/wps6.png');
+		console.log(result);
+	} catch (e) {
+		console.log(e);
+	}
+}
+
+put(); */
 
 
 // 生成唯一编码
@@ -22,7 +40,7 @@ function createRandomId() {
 	return (Math.random() * 10000000).toString(16).substr(0, 4) + '_' + (new Date()).getTime() + '_' + Math.random().toString().substr(2, 5);
 
 }
-const sisyphus = function (host, json) {
+const sisyphus = function ( json) {
 	const config = json.config.clientRequest
 	const getbase64Img = function (url) {
 		let protocol = http
@@ -56,9 +74,9 @@ const sisyphus = function (host, json) {
 					async function putBuffer() {
 						try {
 							let result = await client.put(config.SystemOssChannelName+'/'+createRandomId() + '.' + info.format, data);
-							resolve(result.url)
+							resolve({ source: url, url: result.url, state: "SUCCESS" })
 						} catch (e) {
-							console.log(e);
+							resolve({ source: url, message: e, state: "FAIL" })
 						}
 					}
 
@@ -68,7 +86,7 @@ const sisyphus = function (host, json) {
 				});
 			});
 			req.on('error', function (e) {
-				reject('problem with request: ' + e.message);
+				resolve({ source: url, message: e.message, state: "FAIL" })
 			});
 			req.end();
 		})
@@ -98,8 +116,8 @@ app.post('/catchimage', (req, res) => {
 	req.on('end', function () {
 		json = req.rawBody.toString()
 		json = JSON.parse(json)
-		Promise.all(sisyphus(json.host, json)).then(subres => {
-			res.json(subres)
+		Promise.all(sisyphus(json)).then(subres => {
+			res.json({list:subres})
 		})
 	})
 })
